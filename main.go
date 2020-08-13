@@ -23,4 +23,6 @@ func main() {
 func Welcome(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Welcome, we have what you need!!/n")
 	fmt.Fprintf(w, "Coffe for everyone")
+	fmt.Fprintf(w, "Coffe for everyone")
+
 }
