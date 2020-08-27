@@ -14,14 +14,14 @@ func main() {
 	mux.HandleFunc("/", Welcome)
 	//Creating a handler function and Welcome is an endpoint
 
-	log.Println("Starting server on :4000")
+	log.Println("Starting server on :3000")
 	//Print statement
-	err := http.ListenAndServe(":4000", mux)
+	err := http.ListenAndServe(":3000", mux)
 	log.Fatal(err)
 }
 
 func Welcome(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Welcome, we have what you need!!/n")
+	fmt.Fprintf(w, "Welcome, we have what you need!!")
 	fmt.Fprintf(w, "Coffe for everyone")
 	fmt.Fprintf(w, "Coffe for everyone")
 
