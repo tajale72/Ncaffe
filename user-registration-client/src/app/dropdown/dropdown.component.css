@@ -1,0 +1,47 @@
+* {
+    margin:0;
+    padding:0;
+}
+
+
+
+.wrapper {
+    margin:0 auto;
+}
+.wrapper ul {
+    float:center;
+    list-style: none;
+    
+}
+.wrapper ul li a{
+   color:white;
+    
+}
+
+.wrapper ul li {
+    width: 205.5px;
+    background: linear-gradient(to bottom right, rgb(104, 104, 228), rgb(102, 120, 224),rgb(111, 104, 209));;
+    border: 1px solid #fff;
+    height:50px;
+    line-height:50px;
+    text-align: center;
+    float: left;
+    color: #fff;
+    font-size: 14px;
+    position: relative;
+    font-family: big john;
+}
+
+.wrapper ul li a:hover {
+    background: white;
+    color:black;
+}
+
+.wrapper ul ul {
+    display: none;
+}
+.wrapper ul li:hover>ul {
+    display: block;
+}
+
+

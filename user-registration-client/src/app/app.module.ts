@@ -9,13 +9,15 @@ import { SearchDeleteComponent } from './search-delete/search-delete.component';
 import { HttpClientModule } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { HomeComponent } from './home/home.component';
+import { DropdownComponent } from './dropdown/dropdown.component';
 
 @NgModule({
   declarations: [
     AppComponent,
     RegistrationComponent,
     SearchDeleteComponent,
-    HomeComponent
+    HomeComponent,
+    DropdownComponent
   ],
   imports: [
     BrowserModule,

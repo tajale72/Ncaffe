@@ -62,3 +62,6 @@
   padding-right: 0px;
   padding-left: 183px;
 }
+.container {
+background-image:linear-gradient(to bottom right, rgb(104, 104, 228), rgb(102, 120, 224),rgb(111, 104, 209));
+}

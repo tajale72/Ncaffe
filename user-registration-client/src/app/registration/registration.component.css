@@ -1,24 +1,37 @@
 
 body {
+    background-image:linear-gradient(to bottom right, rgb(104, 104, 228), rgb(102, 120, 224),rgb(111, 104, 209));
     padding-top:50px;
+    height: 100%;
 }
+
 fieldset {
     border: thin solid #ccc; 
     border-radius: 4px;
     padding: 20px;
     padding-left: 40px;
-    background: #fbfbfb;
 }
 legend {
-   color: #678;
+   color: rgb(208, 215, 223);
 }
 .form-control {
     width: 95%;
 }
+
+label {
+    color: rgb(221, 233, 236) !important;
+}
 label small {
-    color: #678 !important;
+    color: rgb(221, 233, 236) !important;
 }
 span.req {
-    color:maroon;
+    color:rgb(221, 233, 236);
     font-size: 112%;
+}
+.btn-btn-success {
+    width: 30%;
+    margin-left: 150px;
+    border:  thin solid #ccc;
+    background-color: transparent ;
+    color: white;
 }
