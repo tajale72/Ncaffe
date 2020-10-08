@@ -13,6 +13,7 @@ pipeline {
 		 stage('checkout') {
 			 steps {
 			  //git(url: 'https://github.com/tajale72/Ncaffe.git')
+			  echo 'hello'
 			  git([url: 'https://github.com/tajale72/Ncaffe.git', branch: 'hisi', credentialsId: 'git-token'])
 			 
 			 }
