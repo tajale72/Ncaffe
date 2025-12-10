@@ -118,11 +118,13 @@ func main() {
 
 	router := gin.Default()
 
-	// CORS middleware
+	// CORS middleware - configured for ngrok
 	config := cors.DefaultConfig()
 	config.AllowAllOrigins = true
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
-	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
+	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"}
+	config.AllowCredentials = true
+	config.ExposeHeaders = []string{"Content-Length", "Content-Type"}
 	router.Use(cors.New(config))
 
 	// Serve static files
@@ -468,8 +470,10 @@ func handleLogin(c *gin.Context) {
 	activeSessions[token] = time.Now().Add(24 * time.Hour)
 	sessionsMu.Unlock()
 
-	// Set cookie
-	c.SetCookie("auth_token", token, 86400, "/", "", false, true)
+	// Set cookie - configured for ngrok
+	// Check if request is from ngrok (HTTPS) or localhost
+	isSecure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
+	setCookieWithSameSite(c, "auth_token", token, 86400, "/", "", isSecure, true)
 
 	c.JSON(http.StatusOK, gin.H{
 		"token":     token,
@@ -496,7 +500,9 @@ func handleLogout(c *gin.Context) {
 		sessionsMu.Unlock()
 	}
 
-	c.SetCookie("auth_token", "", -1, "/", "", false, true)
+	// Clear cookie - configured for ngrok
+	isSecure := c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https"
+	setCookieWithSameSite(c, "auth_token", "", -1, "/", "", isSecure, true)
 	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
@@ -552,6 +558,36 @@ func cleanupSessions() {
 		}
 		sessionsMu.Unlock()
 	}
+}
+
+// setCookieWithSameSite sets a cookie with proper SameSite attribute for ngrok
+func setCookieWithSameSite(c *gin.Context, name, value string, maxAge int, path, domain string, secure, httpOnly bool) {
+	// Build cookie string
+	cookie := fmt.Sprintf("%s=%s", name, value)
+	if maxAge > 0 {
+		cookie += fmt.Sprintf("; Max-Age=%d", maxAge)
+	} else if maxAge < 0 {
+		cookie += "; Max-Age=0"
+	}
+	if path != "" {
+		cookie += fmt.Sprintf("; Path=%s", path)
+	}
+	if domain != "" {
+		cookie += fmt.Sprintf("; Domain=%s", domain)
+	}
+	if secure {
+		cookie += "; Secure"
+	}
+	if httpOnly {
+		cookie += "; HttpOnly"
+	}
+	// Set SameSite=None for ngrok (cross-origin), SameSite=Lax for localhost
+	if secure {
+		cookie += "; SameSite=None"
+	} else {
+		cookie += "; SameSite=Lax"
+	}
+	c.Header("Set-Cookie", cookie)
 }
 
 // getNextOrderID gets the next order ID by finding the highest orderId in the database
