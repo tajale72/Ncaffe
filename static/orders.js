@@ -210,7 +210,7 @@ function createOrderTicket(order) {
 
     // Get product details for items with images and prices
     const itemsHtml = order.items.map(item => {
-        const product = products.find(p => p.id === item.productId);
+        const product = products.find(p => p.productId === item.productId);
         const productName = product ? product.name : `Product #${item.productId}`;
         const productImage = product ? product.image : '📦';
         const productPrice = product ? product.price : 0;

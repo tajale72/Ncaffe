@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // Helper function to create fetch options with ngrok header
-function getFetchOptions(method = 'GET', body = null) {
+function getFetchOptions(method = 'GET', body = null, includeAuth = false) {
     const options = {
         method: method,
         headers: {
@@ -23,6 +23,13 @@ function getFetchOptions(method = 'GET', body = null) {
     if (body) {
         options.headers['Content-Type'] = 'application/json';
         options.body = JSON.stringify(body);
+    }
+    
+    if (includeAuth) {
+        const token = localStorage.getItem('auth_token');
+        if (token) {
+            options.headers['Authorization'] = `Bearer ${token}`;
+        }
     }
     
     return options;
@@ -50,19 +57,26 @@ function displayProducts(productsToShow) {
         return;
     }
 
-    grid.innerHTML = productsToShow.map(product => `
+    grid.innerHTML = productsToShow.map(product => {
+        // Check if image is base64 or emoji
+        const imageDisplay = product.image && product.image.startsWith('data:image') 
+            ? `<img src="${product.image}" alt="${product.name}" class="product-image-img">` 
+            : `<div class="product-image">${product.image || '📦'}</div>`;
+        
+        return `
         <div class="product-card">
-            <div class="product-image">${product.image}</div>
+            ${imageDisplay}
             <div class="product-name">${product.name}</div>
             <div class="product-description">${product.description}</div>
             <div class="product-footer">
                 <div class="product-price">$${product.price.toFixed(2)}</div>
-                <button class="add-to-cart-btn" onclick="addToCart(${product.id})">
+                <button class="add-to-cart-btn" onclick="addToCart(${product.productId})">
                     Add to Cart
                 </button>
             </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 // Filter products by category
@@ -77,7 +91,7 @@ function filterProducts(category) {
 
 // Add product to cart
 function addToCart(productId) {
-    const product = products.find(p => p.id === productId);
+    const product = products.find(p => p.productId === productId);
     if (!product) return;
 
     const existingItem = cart.find(item => item.productId === productId);
@@ -86,7 +100,7 @@ function addToCart(productId) {
         existingItem.quantity++;
     } else {
         cart.push({
-            productId: productId,
+            productId: product.productId,
             quantity: 1,
             product: product
         });
@@ -206,6 +220,145 @@ function setupEventListeners() {
         document.getElementById('checkout-form').reset();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     });
+
+    // Add product form
+    document.getElementById('add-product-form').addEventListener('submit', handleAddProduct);
+    document.getElementById('cancel-product-btn').addEventListener('click', () => {
+        document.getElementById('add-product').style.display = 'none';
+        document.getElementById('add-product-form').reset();
+        document.getElementById('image-preview').innerHTML = '<div class="image-preview-empty">No image selected. Click buttons above to add an image.</div>';
+        document.getElementById('product-error').style.display = 'none';
+    });
+    document.getElementById('camera-btn').addEventListener('click', () => {
+        const input = document.getElementById('product-image');
+        input.setAttribute('capture', 'environment');
+        input.click();
+    });
+    document.getElementById('file-btn').addEventListener('click', () => {
+        const input = document.getElementById('product-image');
+        input.removeAttribute('capture');
+        input.click();
+    });
+    document.getElementById('product-image').addEventListener('change', handleImagePreview);
+    
+    // Check if user is admin (has auth token)
+    checkAdminAccess();
+}
+
+// Check if user has admin access
+function checkAdminAccess() {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+        document.getElementById('add-product-link').style.display = 'block';
+        document.getElementById('add-product-link').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('add-product').style.display = 'block';
+            document.getElementById('add-product').scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+}
+
+// Handle image preview
+function handleImagePreview(e) {
+    const file = e.target.files[0];
+    const preview = document.getElementById('image-preview');
+    
+    if (file) {
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            preview.innerHTML = '<div class="error-message">Image is too large. Please choose an image smaller than 5MB.</div>';
+            e.target.value = '';
+            return;
+        }
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            preview.innerHTML = '<div class="error-message">Please select a valid image file.</div>';
+            e.target.value = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            preview.innerHTML = `
+                <img src="${event.target.result}" alt="Preview">
+                <p style="margin-top: 0.75rem; color: var(--text-medium); font-size: 0.9rem;">
+                    ${file.name} (${(file.size / 1024).toFixed(1)} KB)
+                </p>
+            `;
+        };
+        reader.onerror = () => {
+            preview.innerHTML = '<div class="error-message">Error loading image. Please try again.</div>';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        preview.innerHTML = '<div class="image-preview-empty">No image selected. Click buttons above to add an image.</div>';
+    }
+}
+
+// Handle add product
+async function handleAddProduct(e) {
+    e.preventDefault();
+    
+    const formData = {
+        name: document.getElementById('product-name').value,
+        description: document.getElementById('product-description').value,
+        price: parseFloat(document.getElementById('product-price').value),
+        category: document.getElementById('product-category').value,
+        image: ''
+    };
+    
+    // Get image as base64
+    const imageInput = document.getElementById('product-image');
+    if (imageInput.files && imageInput.files[0]) {
+        const file = imageInput.files[0];
+        formData.image = await fileToBase64(file);
+    } else {
+        // Use default emoji if no image
+        formData.image = '📦';
+    }
+    
+    const errorDiv = document.getElementById('product-error');
+    
+    try {
+        const response = await fetch('/api/products', getFetchOptions('POST', formData, true));
+        
+        if (response.status === 401) {
+            errorDiv.textContent = 'Authentication required. Please login first.';
+            errorDiv.style.display = 'block';
+            return;
+        }
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            errorDiv.textContent = data.error || 'Failed to add product';
+            errorDiv.style.display = 'block';
+            return;
+        }
+        
+        // Success - reload products and reset form
+        showNotification('Product added successfully!');
+        await loadProducts();
+        document.getElementById('add-product-form').reset();
+        document.getElementById('image-preview').innerHTML = '<div class="image-preview-empty">No image selected. Click buttons above to add an image.</div>';
+        document.getElementById('add-product').style.display = 'none';
+        document.getElementById('products').scrollIntoView({ behavior: 'smooth' });
+    } catch (error) {
+        console.error('Error adding product:', error);
+        errorDiv.textContent = 'Failed to add product. Please try again.';
+        errorDiv.style.display = 'block';
+    }
+}
+
+// Convert file to base64
+function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
 }
 
 // Handle checkout
@@ -231,7 +384,7 @@ async function handleCheckout(e) {
     };
 
     try {
-        const response = await fetch('/api/orders', getFetchOptions('POST', formData));
+        const response = await fetch('/api/orders', getFetchOptions('POST', formData, false));
 
         if (!response.ok) {
             throw new Error('Failed to place order');
@@ -268,10 +421,10 @@ function loadCartFromStorage() {
     if (saved) {
         cart = JSON.parse(saved);
         // Re-attach product objects (only if products are loaded)
-        if (products.length > 0) {
-            cart.forEach(item => {
-                item.product = products.find(p => p.id === item.productId);
-            });
+    if (products.length > 0) {
+        cart.forEach(item => {
+            item.product = products.find(p => p.productId === item.productId);
+        });
             // Remove any items where product wasn't found (product might have been removed)
             cart = cart.filter(item => item.product !== undefined);
         }

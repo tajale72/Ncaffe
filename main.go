@@ -21,12 +21,14 @@ import (
 
 // Product represents a bakery item
 type Product struct {
-	ID          int     `json:"id"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Price       float64 `json:"price"`
-	Image       string  `json:"image"`
-	Category    string  `json:"category"`
+	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	ProductID   int                `bson:"productId" json:"productId"`
+	Name        string             `bson:"name" json:"name"`
+	Description string             `bson:"description" json:"description"`
+	Price       float64            `bson:"price" json:"price"`
+	Image       string             `bson:"image" json:"image"` // Base64 encoded image or emoji
+	Category    string             `bson:"category" json:"category"`
+	CreatedAt   time.Time          `bson:"createdAt,omitempty" json:"createdAt,omitempty"`
 }
 
 // OrderItem represents an item in an order
@@ -59,27 +61,17 @@ var (
 	products            []Product
 	productsMu          sync.RWMutex
 	mongoClient         *mongo.Client
+	productsCollection  *mongo.Collection
 	ordersCollection    *mongo.Collection
 	deliveredCollection *mongo.Collection
 	adminUsername       string
 	adminPassword       string
 	activeSessions      = make(map[string]time.Time)
 	sessionsMu          sync.RWMutex
+	productIDCounter    = 0
 )
 
-func init() {
-	// Initialize with sample products
-	products = []Product{
-		{ID: 1, Name: "Chocolate Chip Cookies", Description: "Freshly baked cookies with premium chocolate chips", Price: 8.99, Image: "🍪", Category: "Cookies"},
-		{ID: 2, Name: "Blueberry Muffins", Description: "Moist muffins bursting with fresh blueberries", Price: 6.99, Image: "🧁", Category: "Muffins"},
-		{ID: 3, Name: "Croissant", Description: "Buttery, flaky French croissant", Price: 4.99, Image: "🥐", Category: "Pastries"},
-		{ID: 4, Name: "Chocolate Cake", Description: "Rich chocolate layer cake with buttercream frosting", Price: 24.99, Image: "🎂", Category: "Cakes"},
-		{ID: 5, Name: "Apple Pie", Description: "Homemade apple pie with cinnamon", Price: 18.99, Image: "🥧", Category: "Pies"},
-		{ID: 6, Name: "Bagels", Description: "Fresh New York style bagels (pack of 6)", Price: 7.99, Image: "🥯", Category: "Breads"},
-		{ID: 7, Name: "Cinnamon Roll", Description: "Warm cinnamon rolls with cream cheese glaze", Price: 5.99, Image: "🍩", Category: "Pastries"},
-		{ID: 8, Name: "Strawberry Tart", Description: "Delicate tart with fresh strawberries", Price: 12.99, Image: "🍓", Category: "Tarts"},
-	}
-}
+// init function removed - products now loaded from MongoDB
 
 func main() {
 	// Connect to MongoDB
@@ -103,8 +95,12 @@ func main() {
 	}
 
 	mongoClient = client
+	productsCollection = client.Database("sububakery").Collection("products")
 	ordersCollection = client.Database("sububakery").Collection("orders")
 	deliveredCollection = client.Database("sububakery").Collection("delivered")
+
+	// Load products from MongoDB or initialize with defaults
+	loadProductsFromDB()
 
 	// Get admin credentials from environment or use defaults
 	adminUsername = getEnv("ADMIN_USERNAME", "admin")
@@ -160,6 +156,9 @@ func main() {
 			protected.GET("/orders/:id", getOrder)
 			protected.POST("/orders/:id/deliver", markOrderDelivered)
 			protected.GET("/delivered", getDeliveredOrders)
+			protected.POST("/products", createProduct)
+			protected.PUT("/products/:id", updateProduct)
+			protected.DELETE("/products/:id", deleteProduct)
 		}
 	}
 
@@ -177,24 +176,57 @@ func getEnv(key, defaultValue string) string {
 
 // getProducts returns all products
 func getProducts(c *gin.Context) {
-	productsMu.RLock()
-	defer productsMu.RUnlock()
-	c.JSON(http.StatusOK, products)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	cursor, err := productsCollection.Find(ctx, bson.M{})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var productsList []Product
+	if err = cursor.All(ctx, &productsList); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode products"})
+		return
+	}
+
+	c.JSON(http.StatusOK, productsList)
 }
 
 // getProduct returns a single product by ID
 func getProduct(c *gin.Context) {
 	id := c.Param("id")
-	productsMu.RLock()
-	defer productsMu.RUnlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	for _, product := range products {
-		if fmt.Sprintf("%d", product.ID) == id {
-			c.JSON(http.StatusOK, product)
+	// Try to parse as ObjectID first
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		// Try as productId (int)
+		var product Product
+		err = productsCollection.FindOne(ctx, bson.M{"productId": id}).Decode(&product)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
 			return
 		}
+		c.JSON(http.StatusOK, product)
+		return
 	}
-	c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+
+	var product Product
+	err = productsCollection.FindOne(ctx, bson.M{"_id": objectID}).Decode(&product)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch product"})
+		return
+	}
+
+	c.JSON(http.StatusOK, product)
 }
 
 // createOrder creates a new order
@@ -217,21 +249,18 @@ func createOrder(c *gin.Context) {
 
 	// Calculate total
 	var total float64
-	productsMu.RLock()
-	for _, item := range orderReq.Items {
-		for _, product := range products {
-			if product.ID == item.ProductID {
-				total += product.Price * float64(item.Quantity)
-				break
-			}
-		}
-	}
-	productsMu.RUnlock()
-
-	// Get next order ID from database
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	for _, item := range orderReq.Items {
+		var product Product
+		err := productsCollection.FindOne(ctx, bson.M{"productId": item.ProductID}).Decode(&product)
+		if err == nil {
+			total += product.Price * float64(item.Quantity)
+		}
+	}
+
+	// Get next order ID from database
 	nextOrderID, err := getNextOrderID(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate order ID"})
@@ -609,4 +638,215 @@ func getNextOrderID(ctx context.Context) (int, error) {
 
 	// Return the next order ID
 	return highestOrder.OrderID + 1, nil
+}
+
+// loadProductsFromDB loads products from MongoDB or initializes with defaults
+func loadProductsFromDB() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cursor, err := productsCollection.Find(ctx, bson.M{})
+	if err != nil {
+		log.Println("Error loading products from DB, using defaults:", err)
+		initializeDefaultProducts(ctx)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var productsList []Product
+	if err = cursor.All(ctx, &productsList); err != nil {
+		log.Println("Error decoding products, using defaults:", err)
+		initializeDefaultProducts(ctx)
+		return
+	}
+
+	if len(productsList) == 0 {
+		initializeDefaultProducts(ctx)
+		return
+	}
+
+	productsMu.Lock()
+	products = productsList
+	// Set productIDCounter to highest productId
+	for _, p := range productsList {
+		if p.ProductID > productIDCounter {
+			productIDCounter = p.ProductID
+		}
+	}
+	productsMu.Unlock()
+}
+
+// initializeDefaultProducts creates default products if database is empty
+func initializeDefaultProducts(ctx context.Context) {
+	defaultProducts := []Product{
+		{ProductID: 1, Name: "Chocolate Chip Cookies", Description: "Freshly baked cookies with premium chocolate chips", Price: 8.99, Image: "🍪", Category: "Cookies", CreatedAt: time.Now()},
+		{ProductID: 2, Name: "Blueberry Muffins", Description: "Moist muffins bursting with fresh blueberries", Price: 6.99, Image: "🧁", Category: "Muffins", CreatedAt: time.Now()},
+		{ProductID: 3, Name: "Croissant", Description: "Buttery, flaky French croissant", Price: 4.99, Image: "🥐", Category: "Pastries", CreatedAt: time.Now()},
+		{ProductID: 4, Name: "Chocolate Cake", Description: "Rich chocolate layer cake with buttercream frosting", Price: 24.99, Image: "🎂", Category: "Cakes", CreatedAt: time.Now()},
+		{ProductID: 5, Name: "Apple Pie", Description: "Homemade apple pie with cinnamon", Price: 18.99, Image: "🥧", Category: "Pies", CreatedAt: time.Now()},
+		{ProductID: 6, Name: "Bagels", Description: "Fresh New York style bagels (pack of 6)", Price: 7.99, Image: "🥯", Category: "Breads", CreatedAt: time.Now()},
+		{ProductID: 7, Name: "Cinnamon Roll", Description: "Warm cinnamon rolls with cream cheese glaze", Price: 5.99, Image: "🍩", Category: "Pastries", CreatedAt: time.Now()},
+		{ProductID: 8, Name: "Strawberry Tart", Description: "Delicate tart with fresh strawberries", Price: 12.99, Image: "🍓", Category: "Tarts", CreatedAt: time.Now()},
+	}
+
+	var docs []interface{}
+	for _, p := range defaultProducts {
+		p.ID = primitive.NewObjectID()
+		docs = append(docs, p)
+	}
+
+	_, err := productsCollection.InsertMany(ctx, docs)
+	if err != nil {
+		log.Println("Error inserting default products:", err)
+	}
+
+	productsMu.Lock()
+	products = defaultProducts
+	productIDCounter = 8
+	productsMu.Unlock()
+}
+
+// createProduct creates a new product
+func createProduct(c *gin.Context) {
+	var productReq struct {
+		Name        string  `json:"name"`
+		Description string  `json:"description"`
+		Price       float64 `json:"price"`
+		Image       string  `json:"image"` // Base64 encoded image
+		Category    string  `json:"category"`
+	}
+
+	if err := c.ShouldBindJSON(&productReq); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate required fields
+	if productReq.Name == "" || productReq.Category == "" || productReq.Price <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Name, category, and valid price are required"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Get next product ID
+	nextProductID, err := getNextProductID(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate product ID"})
+		return
+	}
+
+	// Create product
+	product := Product{
+		ID:          primitive.NewObjectID(),
+		ProductID:   nextProductID,
+		Name:        productReq.Name,
+		Description: productReq.Description,
+		Price:       productReq.Price,
+		Image:       productReq.Image,
+		Category:    productReq.Category,
+		CreatedAt:   time.Now(),
+	}
+
+	// Insert into MongoDB
+	_, err = productsCollection.InsertOne(ctx, product)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save product"})
+		return
+	}
+
+	// Update in-memory cache
+	productsMu.Lock()
+	products = append(products, product)
+	productsMu.Unlock()
+
+	c.JSON(http.StatusCreated, product)
+}
+
+// getNextProductID gets the next product ID
+func getNextProductID(ctx context.Context) (int, error) {
+	findOptions := options.FindOne()
+	findOptions.SetSort(bson.D{primitive.E{Key: "productId", Value: -1}})
+
+	var highestProduct Product
+	err := productsCollection.FindOne(ctx, bson.M{}, findOptions).Decode(&highestProduct)
+
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return 1, nil
+		}
+		return 0, err
+	}
+
+	return highestProduct.ProductID + 1, nil
+}
+
+// updateProduct updates an existing product
+func updateProduct(c *gin.Context) {
+	id := c.Param("id")
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID format"})
+		return
+	}
+
+	var productReq struct {
+		Name        string  `json:"name"`
+		Description string  `json:"description"`
+		Price       float64 `json:"price"`
+		Image       string  `json:"image"`
+		Category    string  `json:"category"`
+	}
+
+	if err := c.ShouldBindJSON(&productReq); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	update := bson.M{
+		"$set": bson.M{
+			"name":        productReq.Name,
+			"description": productReq.Description,
+			"price":       productReq.Price,
+			"image":       productReq.Image,
+			"category":    productReq.Category,
+		},
+	}
+
+	result := productsCollection.FindOneAndUpdate(ctx, bson.M{"_id": objectID}, update)
+	if result.Err() != nil {
+		if result.Err() == mongo.ErrNoDocuments {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Product updated successfully"})
+}
+
+// deleteProduct deletes a product
+func deleteProduct(c *gin.Context) {
+	id := c.Param("id")
+	objectID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID format"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err = productsCollection.DeleteOne(ctx, bson.M{"_id": objectID})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete product"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Product deleted successfully"})
 }

@@ -20,6 +20,7 @@
                 <a href="#products">Products</a>
                 <a href="#cart" id="cart-link">Cart (<span id="cart-count">0</span>)</a>
                 <a href="/orders">Orders</a>
+                <a href="#add-product" id="add-product-link" style="display: none;">Add Product</a>
             </nav>
         </div>
     </header>
@@ -27,9 +28,9 @@
     <main>
         <section class="hero">
             <div class="container">
-                <h2>Forno Fresco</h2>
-                <p class="hero-subtitle">Fresh from our oven daily</p>
-                <p class="hero-description">Indulge in our handcrafted Italian pastries, artisanal breads, and decadent cakes made with traditional recipes and the finest ingredients</p>
+                <h2 class="hero-greeting">Ciao</h2>
+                <p class="hero-subtitle">Let the irresistible aroma of freshly baked Italian pastries guide you to the most exquisite artisanal treats</p>
+                <a href="#products" class="hero-cta">View Our Products</a>
             </div>
         </section>
 
@@ -101,6 +102,66 @@
                     <p>We'll contact you soon to confirm your order.</p>
                     <button id="new-order-btn" class="btn-primary">Place Another Order</button>
                 </div>
+            </div>
+        </section>
+
+        <section id="add-product" class="add-product-section" style="display: none;">
+            <div class="container">
+                <h2>Add New Product</h2>
+                <form id="add-product-form" class="product-form">
+                    <div class="form-group">
+                        <label for="product-name">Product Name *</label>
+                        <input type="text" id="product-name" name="name" placeholder="e.g., Chocolate Chip Cookies" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-description">Description</label>
+                        <textarea id="product-description" name="description" rows="3" placeholder="Describe your delicious product..."></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="product-price">Price ($) *</label>
+                            <input type="number" id="product-price" name="price" step="0.01" min="0" placeholder="0.00" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="product-category">Category *</label>
+                            <select id="product-category" name="category" required>
+                                <option value="">Select Category</option>
+                                <option value="Cookies">Cookies</option>
+                                <option value="Cakes">Cakes</option>
+                                <option value="Pastries">Pastries</option>
+                                <option value="Muffins">Muffins</option>
+                                <option value="Pies">Pies</option>
+                                <option value="Breads">Breads</option>
+                                <option value="Tarts">Tarts</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="product-image">Product Image</label>
+                        <div class="image-upload-container">
+                            <input type="file" id="product-image" name="image" accept="image/*" capture="environment">
+                            <div class="image-upload-buttons">
+                                <button type="button" id="camera-btn" class="camera-btn">
+                                    <span>📷</span>
+                                    <span>Use Camera</span>
+                                </button>
+                                <button type="button" id="file-btn" class="file-btn">
+                                    <span>📁</span>
+                                    <span>Choose File</span>
+                                </button>
+                            </div>
+                            <div id="image-preview" class="image-preview">
+                                <div class="image-preview-empty">No image selected. Click buttons above to add an image.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="product-error" class="error-message" style="display: none;"></div>
+                    <div class="form-actions">
+                        <button type="button" id="cancel-product-btn" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary">Add Product</button>
+                    </div>
+                </form>
             </div>
         </section>
     </main>
