@@ -3,6 +3,30 @@ let orders = [];
 let products = [];
 let authToken = null;
 
+// Helper function to create fetch options with ngrok header
+function getFetchOptions(method = 'GET', body = null, includeAuth = false) {
+    const options = {
+        method: method,
+        headers: {
+            'ngrok-skip-browser-warning': '1'
+        }
+    };
+    
+    if (body) {
+        options.headers['Content-Type'] = 'application/json';
+        options.body = JSON.stringify(body);
+    }
+    
+    if (includeAuth) {
+        const token = getAuthToken();
+        if (token) {
+            options.headers['Authorization'] = `Bearer ${token}`;
+        }
+    }
+    
+    return options;
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     // Check authentication first
@@ -14,7 +38,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Load products (needed to display product names in orders)
 async function loadProducts() {
     try {
-        const response = await fetch('/api/products');
+        const response = await fetch('/api/products', getFetchOptions());
         products = await response.json();
     } catch (error) {
         console.error('Error loading products:', error);
@@ -24,7 +48,7 @@ async function loadProducts() {
 // Check authentication status
 async function checkAuthentication() {
     try {
-        const response = await fetch('/api/auth/check');
+        const response = await fetch('/api/auth/check', getFetchOptions());
         const data = await response.json();
         
         if (data.authenticated) {
@@ -76,13 +100,7 @@ async function handleLogin(e) {
     const errorDiv = document.getElementById('login-error');
     
     try {
-        const response = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ username, password })
-        });
+        const response = await fetch('/api/auth/login', getFetchOptions('POST', { username, password }));
         
         const data = await response.json();
         
@@ -108,13 +126,7 @@ async function handleLogin(e) {
 // Handle logout
 async function handleLogout() {
     try {
-        await fetch('/api/auth/logout', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${authToken}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        await fetch('/api/auth/logout', getFetchOptions('POST', null, true));
     } catch (error) {
         console.error('Logout error:', error);
     }
@@ -134,12 +146,7 @@ async function loadOrders() {
     container.innerHTML = '<div class="loading">Loading orders...</div>';
 
     try {
-        const token = getAuthToken();
-        const response = await fetch('/api/orders', {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
+        const response = await fetch('/api/orders', getFetchOptions('GET', null, true));
         
         if (response.status === 401) {
             // Not authenticated, show login
@@ -290,14 +297,7 @@ async function markAsDelivered(orderMongoId, orderId) {
     }
 
     try {
-        const token = getAuthToken();
-        const response = await fetch(`/api/orders/${orderMongoId}/deliver`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
+        const response = await fetch(`/api/orders/${orderMongoId}/deliver`, getFetchOptions('POST', null, true));
 
         if (!response.ok) {
             const error = await response.json();

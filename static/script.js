@@ -11,10 +11,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateCartDisplay();
 });
 
+// Helper function to create fetch options with ngrok header
+function getFetchOptions(method = 'GET', body = null) {
+    const options = {
+        method: method,
+        headers: {
+            'ngrok-skip-browser-warning': '1'
+        }
+    };
+    
+    if (body) {
+        options.headers['Content-Type'] = 'application/json';
+        options.body = JSON.stringify(body);
+    }
+    
+    return options;
+}
+
 // Load products from API
 async function loadProducts() {
     try {
-        const response = await fetch('/api/products');
+        const response = await fetch('/api/products', getFetchOptions());
         products = await response.json();
         filteredProducts = products;
         displayProducts(products);
@@ -214,13 +231,7 @@ async function handleCheckout(e) {
     };
 
     try {
-        const response = await fetch('/api/orders', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(formData)
-        });
+        const response = await fetch('/api/orders', getFetchOptions('POST', formData));
 
         if (!response.ok) {
             throw new Error('Failed to place order');
