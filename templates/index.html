@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subu Bakery - Fresh Baked Delights</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div>
+                <h1>Subu Bakery</h1>
+                <p class="tagline">Artisan Italian Motivated Bakery</p>
+            </div>
+            <nav>
+                <a href="#products">Products</a>
+                <a href="#cart" id="cart-link">Cart (<span id="cart-count">0</span>)</a>
+                <a href="/orders">Orders</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="container">
+                <h2>Forno Fresco</h2>
+                <p class="hero-subtitle">Fresh from our oven daily</p>
+                <p class="hero-description">Indulge in our handcrafted Italian pastries, artisanal breads, and decadent cakes made with traditional recipes and the finest ingredients</p>
+            </div>
+        </section>
+
+        <section id="products" class="products-section">
+            <div class="container">
+                <h2>Our Products</h2>
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-category="all">All</button>
+                    <button class="filter-btn" data-category="Cookies">Cookies</button>
+                    <button class="filter-btn" data-category="Cakes">Cakes</button>
+                    <button class="filter-btn" data-category="Pastries">Pastries</button>
+                    <button class="filter-btn" data-category="Muffins">Muffins</button>
+                    <button class="filter-btn" data-category="Pies">Pies</button>
+                    <button class="filter-btn" data-category="Breads">Breads</button>
+                    <button class="filter-btn" data-category="Tarts">Tarts</button>
+                </div>
+                <div id="products-grid" class="products-grid">
+                    <!-- Products will be loaded here -->
+                </div>
+            </div>
+        </section>
+
+        <section id="cart" class="cart-section">
+            <div class="container">
+                <h2>Your Cart</h2>
+                <div id="cart-items" class="cart-items">
+                    <p class="empty-cart">Your cart is empty</p>
+                </div>
+                <div id="cart-total" class="cart-total" style="display: none;">
+                    <p>Total: $<span id="total-amount">0.00</span></p>
+                    <button id="checkout-btn" class="checkout-btn">Proceed to Checkout</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="checkout" class="checkout-section" style="display: none;">
+            <div class="container">
+                <h2>Checkout</h2>
+                <form id="checkout-form">
+                    <div class="form-group">
+                        <label for="name">Full Name *</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email *</label>
+                        <input type="email" id="email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">Phone *</label>
+                        <input type="tel" id="phone" name="phone" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="address">Delivery Address *</label>
+                        <textarea id="address" name="address" rows="3" required></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" id="cancel-checkout" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary">Place Order</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section id="order-success" class="order-success" style="display: none;">
+            <div class="container">
+                <div class="success-content">
+                    <h2>✅ Order Placed Successfully!</h2>
+                    <p>Your order ID is: <strong id="order-id"></strong></p>
+                    <p>We'll contact you soon to confirm your order.</p>
+                    <button id="new-order-btn" class="btn-primary">Place Another Order</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 Subu Bakery. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
+

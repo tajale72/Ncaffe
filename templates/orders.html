@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orders - Subu Bakery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/orders.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div>
+                <h1>Subu Bakery</h1>
+                <p class="tagline">Artisan Italian Motivated Bakery</p>
+            </div>
+            <nav>
+                <a href="/">Home</a>
+                <a href="/orders">Orders</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="login-modal">
+        <div class="login-content">
+            <h2>Admin Login</h2>
+            <p class="login-subtitle">Access to orders requires authentication</p>
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required autocomplete="current-password">
+                </div>
+                <div id="login-error" class="error-message" style="display: none;"></div>
+                <button type="submit" class="btn-primary">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <main>
+        <section class="orders-section" id="orders-section" style="display: none;">
+            <div class="container">
+                <div class="orders-header">
+                    <h2>Order Tickets</h2>
+                    <div class="header-actions">
+                        <button id="logout-btn" class="logout-btn">Logout</button>
+                        <button id="refresh-btn" class="refresh-btn">↻ Refresh</button>
+                    </div>
+                </div>
+                <div id="orders-container" class="orders-container">
+                    <div class="loading">Loading orders...</div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 Subu Bakery. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="/static/orders.js"></script>
+</body>
+</html>
+
