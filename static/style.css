@@ -1092,3 +1092,20 @@ footer p {
         padding: 2.5rem 1.5rem;
     }
 }
+
+
+.close-btn {
+    position: absolute;
+    right: 15px;
+    top: 15px;
+    background: none;
+    border: none;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #d2691e;
+}
+
+.close-btn:hover {
+    color: #a65318;
+}

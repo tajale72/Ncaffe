@@ -462,6 +462,7 @@
     max-width: 450px;
     width: 100%;
     border: 2px solid var(--golden-yellow);
+    position: relative;
 }
 
 .login-content h2 {

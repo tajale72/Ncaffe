@@ -35,6 +35,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupEventListeners();
 });
 
+document.getElementById("close-login").addEventListener("click", () => {
+    window.location.href = "/"; // Go to home page
+});
+
+
 // Load products (needed to display product names in orders)
 async function loadProducts() {
     try {
