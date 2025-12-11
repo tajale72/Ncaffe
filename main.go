@@ -104,7 +104,7 @@ func main() {
 
 	// Get admin credentials from environment or use defaults
 	adminUsername = getEnv("ADMIN_USERNAME", "admin")
-	adminPassword = getEnv("ADMIN_PASSWORD", "subu369")
+	adminPassword = getEnv("ADMIN_PASSWORD", "admin")
 
 	// Clean up expired sessions periodically
 	go cleanupSessions()
