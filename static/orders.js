@@ -11,19 +11,19 @@ function getFetchOptions(method = 'GET', body = null, includeAuth = false) {
             'ngrok-skip-browser-warning': '1'
         }
     };
-    
+
     if (body) {
         options.headers['Content-Type'] = 'application/json';
         options.body = JSON.stringify(body);
     }
-    
+
     if (includeAuth) {
         const token = getAuthToken();
         if (token) {
             options.headers['Authorization'] = `Bearer ${token}`;
         }
     }
-    
+
     return options;
 }
 
@@ -55,7 +55,7 @@ async function checkAuthentication() {
     try {
         const response = await fetch('/api/auth/check', getFetchOptions());
         const data = await response.json();
-        
+
         if (data.authenticated) {
             // Get token from cookie or localStorage
             authToken = getAuthToken();
@@ -99,26 +99,26 @@ function showOrdersPage() {
 // Handle login
 async function handleLogin(e) {
     e.preventDefault();
-    
+
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
     const errorDiv = document.getElementById('login-error');
-    
+
     try {
         const response = await fetch('/api/auth/login', getFetchOptions('POST', { username, password }));
-        
+
         const data = await response.json();
-        
+
         if (!response.ok) {
             errorDiv.textContent = data.error || 'Login failed';
             errorDiv.style.display = 'block';
             return;
         }
-        
+
         // Store token
         authToken = data.token;
         localStorage.setItem('auth_token', data.token);
-        
+
         // Hide login modal and show orders
         showOrdersPage();
     } catch (error) {
@@ -135,11 +135,11 @@ async function handleLogout() {
     } catch (error) {
         console.error('Logout error:', error);
     }
-    
+
     // Clear token
     authToken = null;
     localStorage.removeItem('auth_token');
-    
+
     // Show login modal
     showLoginModal();
     document.getElementById('login-form').reset();
@@ -152,13 +152,13 @@ async function loadOrders() {
 
     try {
         const response = await fetch('/api/orders', getFetchOptions('GET', null, true));
-        
+
         if (response.status === 401) {
             // Not authenticated, show login
             showLoginModal();
             return;
         }
-        
+
         if (!response.ok) {
             throw new Error('Failed to load orders');
         }
@@ -214,27 +214,48 @@ function createOrderTicket(order) {
     const orderMongoId = order.id || (order._id ? String(order._id) : null);
 
     // Get product details for items with images and prices
+    // Get product details for items with images and prices
     const itemsHtml = order.items.map(item => {
         const product = products.find(p => p.productId === item.productId);
         const productName = product ? product.name : `Product #${item.productId}`;
         const productImage = product ? product.image : '📦';
         const productPrice = product ? product.price : 0;
         const itemTotal = productPrice * item.quantity;
-        
+
+        // Determine image display format
+        let imageDisplay = '';
+
+        if (!productImage) {
+            imageDisplay = `<div class="order-item-image">📦</div>`;
+        }
+        else if (productImage.startsWith('data:image')) {
+            imageDisplay = `<img src="${productImage}" class="order-item-image-img" alt="${productName}">`;
+        }
+        else if (productImage.startsWith('http://') || productImage.startsWith('https://')) {
+            imageDisplay = `<img src="${productImage}" class="order-item-image-img" alt="${productName}">`;
+        }
+        else if (productImage.length <= 4) {
+            imageDisplay = `<div class="order-item-image">${productImage}</div>`;
+        }
+        else {
+            imageDisplay = `<div class="order-item-image">📦</div>`;
+        }
+
         return `
-            <li class="order-item-row">
-                <div class="order-item-image">${productImage}</div>
-                <div class="order-item-details">
-                    <div class="order-item-name">${productName}</div>
-                    <div class="order-item-price-info">
-                        <span class="order-item-unit-price">$${productPrice.toFixed(2)} each</span>
-                        <span class="order-item-quantity">× ${item.quantity}</span>
-                    </div>
+        <li class="order-item-row">
+            ${imageDisplay}
+            <div class="order-item-details">
+                <div class="order-item-name">${productName}</div>
+                <div class="order-item-price-info">
+                    <span class="order-item-unit-price">$${productPrice.toFixed(2)} each</span>
+                    <span class="order-item-quantity">× ${item.quantity}</span>
                 </div>
-                <div class="order-item-total">$${itemTotal.toFixed(2)}</div>
-            </li>
-        `;
+            </div>
+            <div class="order-item-total">$${itemTotal.toFixed(2)}</div>
+        </li>
+    `;
     }).join('');
+
 
     // Only show delivered button if order is not already delivered and we have a valid MongoDB ID
     const deliveredButton = (statusClass !== 'delivered' && orderMongoId) ? `
@@ -311,7 +332,7 @@ async function markAsDelivered(orderMongoId, orderId) {
 
         const result = await response.json();
         showNotification(`Order #${orderId} has been marked as delivered!`);
-        
+
         // Reload orders to remove the delivered order
         loadOrders();
     } catch (error) {
