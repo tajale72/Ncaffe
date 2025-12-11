@@ -285,11 +285,23 @@
     box-shadow: var(--shadow-soft);
 }
 
+/* Make order images same style as product images */
+.order-item-image-img {
+    width: 70px;         /* match product image size */
+    height: 70px;
+    object-fit: cover;   /* crop nicely without distortion */
+    border-radius: 8px;  /* same rounded corners */
+    border: 1px solid #ddd;
+}
+
+/* If using emoji icon */
 .order-item-image {
-    font-size: 3rem;
-    min-width: 60px;
-    text-align: center;
-    filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.1));
+    width: 70px;
+    height: 70px;
+    font-size: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .order-item-details {
