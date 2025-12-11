@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -125,6 +126,8 @@ func main() {
 
 	// Serve static files
 	router.Static("/static", "./static")
+	// Serve uploaded images
+	router.Static("/uploads", "./uploads")
 	router.LoadHTMLGlob("templates/*")
 
 	// Routes
@@ -706,57 +709,77 @@ func initializeDefaultProducts(ctx context.Context) {
 	productsMu.Unlock()
 }
 
-// createProduct creates a new product
+// createProduct creates a new product (multipart/form-data, file upload)
 func createProduct(c *gin.Context) {
-	var productReq struct {
-		Name        string  `json:"name"`
-		Description string  `json:"description"`
-		Price       float64 `json:"price"`
-		Image       string  `json:"image"` // Base64 encoded image
-		Category    string  `json:"category"`
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	if err := c.ShouldBindJSON(&productReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+	// Read text fields from form-data
+	name := c.PostForm("name")
+	description := c.PostForm("description")
+	priceStr := c.PostForm("price")
+	category := c.PostForm("category")
+
+	// Convert price string → float64
+	price, _ := strconv.ParseFloat(priceStr, 64)
 
 	// Validate required fields
-	if productReq.Name == "" || productReq.Category == "" || productReq.Price <= 0 {
+	if name == "" || category == "" || price <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Name, category, and valid price are required"})
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// Handle image upload
+	file, err := c.FormFile("image")
+	var imageURL string
+	host := c.Request.Host
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
 
-	// Get next product ID
+	fullDomain := fmt.Sprintf("%s://%s", scheme, host)
+
+	if err == nil && file != nil {
+		// Save image to /uploads folder
+		filename := fmt.Sprintf("uploads/%d_%s", time.Now().Unix(), file.Filename)
+		if err := c.SaveUploadedFile(file, filename); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Image upload failed"})
+			return
+		}
+		imageURL = fullDomain + "/" + filename
+	} else {
+		// no image uploaded → default placeholder
+		imageURL = "/images/default.png"
+	}
+
+	// Generate productID
 	nextProductID, err := getNextProductID(ctx)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate product ID"})
 		return
 	}
 
-	// Create product
+	// Create product struct
 	product := Product{
 		ID:          primitive.NewObjectID(),
 		ProductID:   nextProductID,
-		Name:        productReq.Name,
-		Description: productReq.Description,
-		Price:       productReq.Price,
-		Image:       productReq.Image,
-		Category:    productReq.Category,
+		Name:        name,
+		Description: description,
+		Price:       price,
+		Image:       imageURL,
+		Category:    category,
 		CreatedAt:   time.Now(),
 	}
 
-	// Insert into MongoDB
+	// Save to MongoDB
 	_, err = productsCollection.InsertOne(ctx, product)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save product"})
 		return
 	}
 
-	// Update in-memory cache
+	// Update cache
 	productsMu.Lock()
 	products = append(products, product)
 	productsMu.Unlock()
@@ -791,31 +814,47 @@ func updateProduct(c *gin.Context) {
 		return
 	}
 
-	var productReq struct {
-		Name        string  `json:"name"`
-		Description string  `json:"description"`
-		Price       float64 `json:"price"`
-		Image       string  `json:"image"`
-		Category    string  `json:"category"`
+	// Read text fields from multipart/form-data
+	name := c.PostForm("name")
+	description := c.PostForm("description")
+	priceStr := c.PostForm("price")
+	category := c.PostForm("category")
+
+	// Convert price from string → float
+	price, _ := strconv.ParseFloat(priceStr, 64)
+
+	// Handle optional image
+	file, err := c.FormFile("image")
+
+	var imageURL string
+
+	if err == nil && file != nil {
+		// Save the new image
+		filename := "uploads/" + file.Filename
+		if err := c.SaveUploadedFile(file, filename); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Image upload failed"})
+			return
+		}
+		imageURL = "/" + filename
 	}
 
-	if err := c.ShouldBindJSON(&productReq); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	// Build update object
+	update := bson.M{
+		"$set": bson.M{
+			"name":        name,
+			"description": description,
+			"price":       price,
+			"category":    category,
+		},
+	}
+
+	// Only update the image if new file was uploaded
+	if imageURL != "" {
+		update["$set"].(bson.M)["image"] = imageURL
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	update := bson.M{
-		"$set": bson.M{
-			"name":        productReq.Name,
-			"description": productReq.Description,
-			"price":       productReq.Price,
-			"image":       productReq.Image,
-			"category":    productReq.Category,
-		},
-	}
 
 	result := productsCollection.FindOneAndUpdate(ctx, bson.M{"_id": objectID}, update)
 	if result.Err() != nil {

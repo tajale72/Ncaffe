@@ -58,25 +58,46 @@ function displayProducts(productsToShow) {
     }
 
     grid.innerHTML = productsToShow.map(product => {
-        // Check if image is base64 or emoji
-        const imageDisplay = product.image && product.image.startsWith('data:image') 
-            ? `<img src="${product.image}" alt="${product.name}" class="product-image-img">` 
-            : `<div class="product-image">${product.image || '📦'}</div>`;
-        
+
+        let imageDisplay = '';
+    
+        if (!product.image) {
+            // Nothing stored → show default icon
+            imageDisplay = `<div class="product-image">📦</div>`;
+        }
+        else if (product.image.startsWith('data:image')) {
+            // Base64 image
+            imageDisplay = `<img src="${product.image}" alt="${product.name}" class="product-image-img">`;
+        }
+        else if (product.image.startsWith('http://') || product.image.startsWith('https://')) {
+            // Hosted image (localhost OR ngrok)
+            imageDisplay = `<img src="${product.image}" alt="${product.name}" class="product-image-img">`;
+        }
+        else if (product.image.length <= 4) {
+            // Emoji/icon (like 📦 or 🍞)
+            imageDisplay = `<div class="product-image">${product.image}</div>`;
+        }
+        else {
+            // Fallback — in case something unexpected is stored
+            imageDisplay = `<div class="product-image">📦</div>`;
+        }
+    
         return `
-        <div class="product-card">
-            ${imageDisplay}
-            <div class="product-name">${product.name}</div>
-            <div class="product-description">${product.description}</div>
-            <div class="product-footer">
-                <div class="product-price">$${product.price.toFixed(2)}</div>
-                <button class="add-to-cart-btn" onclick="addToCart(${product.productId})">
-                    Add to Cart
-                </button>
+            <div class="product-card">
+                ${imageDisplay}
+                <div class="product-name">${product.name}</div>
+                <div class="product-description">${product.description}</div>
+                <div class="product-footer">
+                    <div class="product-price">$${product.price.toFixed(2)}</div>
+                    <button class="add-to-cart-btn" onclick="addToCart(${product.productId})">
+                        Add to Cart
+                    </button>
+                </div>
             </div>
-        </div>
-    `;
+        `;
     }).join('');
+    
+    
 }
 
 // Filter products by category
@@ -297,59 +318,70 @@ function handleImagePreview(e) {
 }
 
 // Handle add product
+// Handle add product (NO AUTH)
 async function handleAddProduct(e) {
     e.preventDefault();
-    
-    const formData = {
-        name: document.getElementById('product-name').value,
-        description: document.getElementById('product-description').value,
-        price: parseFloat(document.getElementById('product-price').value),
-        category: document.getElementById('product-category').value,
-        image: ''
-    };
-    
-    // Get image as base64
-    const imageInput = document.getElementById('product-image');
-    if (imageInput.files && imageInput.files[0]) {
-        const file = imageInput.files[0];
-        formData.image = await fileToBase64(file);
-    } else {
-        // Use default emoji if no image
-        formData.image = '📦';
-    }
-    
+
     const errorDiv = document.getElementById('product-error');
-    
+    errorDiv.style.display = 'none';
+
+    // Create FormData for file upload
+    const formData = new FormData();
+    formData.append("name", document.getElementById('product-name').value);
+    formData.append("description", document.getElementById('product-description').value);
+    formData.append("price", document.getElementById('product-price').value);
+    formData.append("category", document.getElementById('product-category').value);
+
+    const imageInput = document.getElementById('product-image');
+
+    // Add image if selected
+    if (imageInput.files && imageInput.files[0]) {
+        formData.append("image", imageInput.files[0]);
+    } else {
+        formData.append("image", "");
+    }
+
     try {
-        const response = await fetch('/api/products', getFetchOptions('POST', formData, true));
-        
+        const response = await fetch('/api/products', {
+            method: "POST",
+            body: formData  // browser sets multipart/form-data automatically
+        });
+
         if (response.status === 401) {
             errorDiv.textContent = 'Authentication required. Please login first.';
             errorDiv.style.display = 'block';
             return;
         }
-        
+
+
         const data = await response.json();
-        
+
         if (!response.ok) {
             errorDiv.textContent = data.error || 'Failed to add product';
             errorDiv.style.display = 'block';
             return;
         }
-        
-        // Success - reload products and reset form
+
+        // Success - reset UI
         showNotification('Product added successfully!');
         await loadProducts();
+
         document.getElementById('add-product-form').reset();
-        document.getElementById('image-preview').innerHTML = '<div class="image-preview-empty">No image selected. Click buttons above to add an image.</div>';
+        document.getElementById('image-preview').innerHTML =
+            '<div class="image-preview-empty">No image selected. Click buttons above to add an image.</div>';
+
         document.getElementById('add-product').style.display = 'none';
-        document.getElementById('products').scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('products').scrollIntoView({
+            behavior: 'smooth'
+        });
+
     } catch (error) {
         console.error('Error adding product:', error);
         errorDiv.textContent = 'Failed to add product. Please try again.';
         errorDiv.style.display = 'block';
     }
 }
+
 
 // Convert file to base64
 function fileToBase64(file) {
