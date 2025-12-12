@@ -167,7 +167,7 @@ func main() {
 
 	// Start server
 	fmt.Println("Subu Bakery server starting on :8080")
-	log.Fatal(router.Run(":8080"))
+	log.Fatal(router.Run(":8085"))
 }
 
 func getEnv(key, defaultValue string) string {
