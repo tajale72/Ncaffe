@@ -129,19 +129,33 @@ nav a:hover::after {
 
 /* Hero Section */
 .hero {
-    background: var(--white);
+    background-image: url('http://wraithlike-lena-heartaching.ngrok-free.dev/uploads/1765510465_premium_photo-1681826543445-e84c16a952b4.avif');
+    background-size: cover;
+    background-position: center;
     padding: 8rem 0 6rem;
     text-align: center;
-    color: var(--text-dark);
     position: relative;
     min-height: 60vh;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: white; /* base text color */
 }
 
+/* ⭐ Add a soft dark overlay */
+.hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);  /* Adjust opacity for readability */
+    z-index: 1;
+}
+
+/* Ensure text sits above overlay */
 .hero .container {
     max-width: 900px;
+    position: relative;
+    z-index: 2;
 }
 
 .hero-greeting {
@@ -149,7 +163,7 @@ nav a:hover::after {
     font-size: 5.5rem;
     font-weight: 400;
     margin-bottom: 2rem;
-    color: var(--primary-brown);
+    color: white;
     letter-spacing: 2px;
     line-height: 1.2;
 }
@@ -158,13 +172,14 @@ nav a:hover::after {
     font-family: 'Lato', sans-serif;
     font-size: 1.35rem;
     font-weight: 300;
-    color: var(--text-medium);
+    color: white;
     margin-bottom: 3rem;
     line-height: 1.8;
     max-width: 700px;
     margin-left: auto;
     margin-right: auto;
 }
+
 
 .hero-cta {
     display: inline-block;
